@@ -1,0 +1,216 @@
+name: Build SM-R960 KernelSU Kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      ksu_ref:
+        description: "KernelSU ref: stable, main, or tag like v1.0.5"
+        required: true
+        default: "stable"
+      build_stock_first:
+        description: "Build stock kernel first before adding KernelSU"
+        required: true
+        default: "true"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build R960 KernelSU
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repo with LFS
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Pull LFS files
+        run: |
+          git lfs pull
+          ls -lh source
+
+      - name: Install build dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            build-essential bc bison flex libssl-dev libelf-dev \
+            python3 python-is-python3 perl git unzip zip tar lz4 xz-utils zstd \
+            clang-14 lld-14 llvm-14 rsync cpio kmod dwarves patch file curl \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+
+      - name: Download Android clang r450784e
+        run: |
+          mkdir -p toolchains
+          cd toolchains
+
+          git clone --depth=1 --filter=blob:none --sparse \
+            https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 \
+            android-clang
+
+          cd android-clang
+          git sparse-checkout set clang-r450784e
+
+          echo "$PWD/clang-r450784e/bin" >> "$GITHUB_PATH"
+
+          echo "===== CLANG CHECK ====="
+          clang --version || true
+          ./clang-r450784e/bin/clang --version
+
+      - name: Extract Samsung source
+        run: |
+          set -e
+
+          mkdir -p work/kernel
+
+          echo "===== SOURCE FILES ====="
+          ls -lh source
+
+          echo "===== EXTRACT BASE KERNEL ====="
+          tar -xzf source/Kernel.tar.gz -C work/kernel
+
+          echo "===== APPLY R960 DIFF OVER BASE ====="
+          tar -xzf source/R960XXU1CYK2_Kernel.tar.gz -C work/kernel --strip-components=1
+
+          echo "===== CHECK DEFCONFIG ====="
+          find work/kernel/arch/arm64/configs -type f | grep -i "wise6blue"
+
+          echo "===== TOP LEVEL ====="
+          ls -la work/kernel | head
+
+      - name: Build stock kernel first
+        if: ${{ github.event.inputs.build_stock_first == 'true' }}
+        run: |
+          set -e
+          cd work/kernel
+
+          export PLATFORM_VERSION=16
+          export TARGET_SOC=s5e5515
+          export ARCH=arm64
+          export LLVM=1
+          export LLVM_IAS=1
+          export PATH="$GITHUB_WORKSPACE/toolchains/android-clang/clang-r450784e/bin:$PATH"
+
+          make O=out s5e5515-wise6blue_defconfig
+          make O=out -j"$(nproc)"
+
+          mkdir -p "$GITHUB_WORKSPACE/dist/stock"
+          cp out/arch/arm64/boot/Image "$GITHUB_WORKSPACE/dist/stock/Image-stock-R960"
+          cp out/.config "$GITHUB_WORKSPACE/dist/stock/stock.config"
+
+          echo "===== STOCK IMAGE ====="
+          ls -lh "$GITHUB_WORKSPACE/dist/stock/Image-stock-R960"
+
+      - name: Add KernelSU support
+        run: |
+          set -e
+          cd work/kernel
+
+          echo "===== ADDING KERNELSU ====="
+
+          if [ "${{ github.event.inputs.ksu_ref }}" = "stable" ]; then
+            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
+          else
+            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s "${{ github.event.inputs.ksu_ref }}"
+          fi
+
+          echo "===== KERNELSU CHECK ====="
+          find . -maxdepth 3 -iname "*kernelsu*" -o -iname "*ksu*" | head -80
+
+      - name: Build KernelSU kernel
+        run: |
+          set -e
+          cd work/kernel
+
+          export PLATFORM_VERSION=16
+          export TARGET_SOC=s5e5515
+          export ARCH=arm64
+          export LLVM=1
+          export LLVM_IAS=1
+          export PATH="$GITHUB_WORKSPACE/toolchains/android-clang/clang-r450784e/bin:$PATH"
+
+          make O=out s5e5515-wise6blue_defconfig
+          make O=out olddefconfig
+
+          echo "===== KSU CONFIG CHECK ====="
+          grep -Ei "KSU|KERNELSU" out/.config || true
+
+          make O=out -j"$(nproc)"
+
+          mkdir -p "$GITHUB_WORKSPACE/dist/kernelsu"
+          cp out/arch/arm64/boot/Image "$GITHUB_WORKSPACE/dist/kernelsu/Image-KernelSU-R960"
+          cp out/.config "$GITHUB_WORKSPACE/dist/kernelsu/kernelsu.config"
+
+          echo "===== BUILT IMAGE ====="
+          ls -lh "$GITHUB_WORKSPACE/dist/kernelsu/Image-KernelSU-R960"
+
+      - name: Collect modules and logs
+        run: |
+          set -e
+
+          cd work/kernel
+
+          mkdir -p "$GITHUB_WORKSPACE/dist/modules"
+
+          find out -type f -name "*.ko" -print -exec cp --parents {} "$GITHUB_WORKSPACE/dist/modules/" \; || true
+
+          cd "$GITHUB_WORKSPACE/dist"
+
+          tar -czf R960-modules.tar.gz modules || true
+
+          cat > RELEASE_NOTES.txt <<EOF
+          SM-R960 Galaxy Watch6 Classic Kernel Build
+
+          Device: SM-R960 / wise6bl / wise6blue
+          Base source: SM-R930_NA_Opensource Kernel.tar.gz
+          R960 diff: R960XXU1CYK2_Kernel.tar.gz
+          Defconfig: s5e5515-wise6blue_defconfig
+          KernelSU ref: ${{ github.event.inputs.ksu_ref }}
+
+          Output:
+          - kernelsu/Image-KernelSU-R960
+          - kernelsu/kernelsu.config
+          - stock/Image-stock-R960, if stock build was enabled
+          - R960-modules.tar.gz, if modules were built
+
+          WARNING:
+          This is only the raw kernel Image. It is not flashable by itself.
+          It must be repacked into the matching R960XXU2CZB6 boot.img.
+          Do not flash on a locked bootloader.
+          EOF
+
+          sha256sum \
+            kernelsu/Image-KernelSU-R960 \
+            kernelsu/kernelsu.config \
+            R960-modules.tar.gz \
+            > SHA256SUMS.txt
+
+          if [ -f stock/Image-stock-R960 ]; then
+            sha256sum stock/Image-stock-R960 stock/stock.config >> SHA256SUMS.txt
+          fi
+
+          echo "===== DIST FILES ====="
+          find "$GITHUB_WORKSPACE/dist" -type f -maxdepth 3 -print -exec ls -lh {} \;
+
+      - name: Create release tag name
+        id: vars
+        run: |
+          TAG="r960-kernelsu-${{ github.run_number }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Using tag: $TAG"
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: SM-R960 KernelSU Build ${{ steps.vars.outputs.tag }}
+          body_path: dist/RELEASE_NOTES.txt
+          files: |
+            dist/kernelsu/Image-KernelSU-R960
+            dist/kernelsu/kernelsu.config
+            dist/stock/Image-stock-R960
+            dist/stock/stock.config
+            dist/R960-modules.tar.gz
+            dist/SHA256SUMS.txt
+            dist/RELEASE_NOTES.txt
