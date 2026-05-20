@@ -35,7 +35,10 @@ jobs:
           set -e
           mkdir -p source
 
-          gh release download "${{ github.event.inputs.source_release_tag }}"             --repo "${{ github.repository }}"             --dir source             --pattern "*.tar.gz"
+          gh release download "${{ github.event.inputs.source_release_tag }}" \
+            --repo "${{ github.repository }}" \
+            --dir source \
+            --pattern "*.tar.gz"
 
           echo "===== SOURCE FILES ====="
           ls -lh source
@@ -50,7 +53,12 @@ jobs:
           set -e
           mkdir -p firmware
 
-          gh release download "${{ github.event.inputs.firmware_release_tag }}"             --repo "${{ github.repository }}"             --dir firmware             --pattern "boot.img*"             --pattern "init_boot.img*"             --pattern "vbmeta.img*"
+          gh release download "${{ github.event.inputs.firmware_release_tag }}" \
+            --repo "${{ github.repository }}" \
+            --dir firmware \
+            --pattern "boot.img*" \
+            --pattern "init_boot.img*" \
+            --pattern "vbmeta.img*"
 
           echo "===== FIRMWARE FILES ====="
           ls -lh firmware
@@ -59,7 +67,13 @@ jobs:
         run: |
           set -e
           sudo apt update
-          sudo apt install -y             build-essential bc bison flex libssl-dev libelf-dev             python3 python-is-python3 perl git unzip zip tar lz4 xz-utils zstd             clang-14 lld-14 llvm-14 rsync cpio kmod dwarves patch file curl             openssl             gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu             gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi
+          sudo apt install -y \
+            build-essential bc bison flex libssl-dev libelf-dev \
+            python3 python-is-python3 perl git unzip zip tar lz4 xz-utils zstd \
+            clang-14 lld-14 llvm-14 rsync cpio kmod dwarves patch file curl \
+            openssl \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi
 
       - name: Set clang 14 path
         run: |
@@ -85,197 +99,22 @@ jobs:
         run: |
           set -e
 
+          # Capture absolute path to the patch file in your checked-out workspace
+          PATCH_SRC="$GITHUB_WORKSPACE/patches/resukisu_manual_hooks.patch"
+
           cd work/kernel
 
           echo "===== ADDING ReSukiSU ====="
           curl -LSs "${{ github.event.inputs.resukisu_setup_url }}" |
           bash -
 
-          echo "===== APPLYING INLINE MANUAL HOOK PATCHES ====="
-          cat << 'EOF' > resukisu_manual_hooks.patch
-          --- a/fs/stat.c
-          +++ b/fs/stat.c
-          @@ -353,6 +353,16 @@
-           	return cp_new_stat(&stat, statbuf);
-           }
-           
-          +#ifdef CONFIG_KSU_MANUAL_HOOK
-          +__attribute__((hot)) 
-          +extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
-          +extern void ksu_handle_newfstat_ret(unsigned int *fd, struct stat __user **statbuf_ptr);
-          +#if defined(__ARCH_WANT_STAT64) || defined(__ARCH_WANT_COMPAT_STAT64)
-          +extern void ksu_handle_fstat64_ret(unsigned long *fd, struct stat64 __user **statbuf_ptr);
-          +#endif
-          +#endif
-          +
-           #if !defined(__ARCH_WANT_STAT64) || defined(__ARCH_WANT_SYS_NEWFSTATAT)
-           SYSCALL_DEFINE4(newfstatat, int, dfd, const char __user *, filename,
-           		struct stat __user *, statbuf, int, flag)
-          @@ -360,6 +370,9 @@
-           	struct kstat stat;
-           	int error;
-           
-          +#ifdef CONFIG_KSU_MANUAL_HOOK
-          +	ksu_handle_stat(&dfd, &filename, &flag);
-          +#endif
-           	error = vfs_fstatat(dfd, filename, &stat, flag);
-           	if (error)
-           		return error;
-          @@ -367,6 +380,9 @@
-           SYSCALL_DEFINE2(newfstat, unsigned int, fd, struct stat __user *, statbuf)
-           {
-           	struct kstat stat;
-          +#ifdef CONFIG_KSU_MANUAL_HOOK
-          +	ksu_handle_newfstat_ret(&fd, &statbuf);
-          +#endif
-           	int error = vfs_fstat(fd, &stat);
-           
-           	if (!error)
-          @@ -390,6 +406,9 @@
-           SYSCALL_DEFINE2(fstat64, unsigned long, fd, struct stat64 __user *, statbuf)
-           {
-           	struct kstat stat;
-          +#ifdef CONFIG_KSU_MANUAL_HOOK
-          +	ksu_handle_fstat64_ret(&fd, &statbuf);
-          +#endif
-           	int error = vfs_fstat(fd, &stat);
-           
-           	if (!error)
-          @@ -504,6 +523,9 @@
-           	struct kstat stat;
-           	int error;
-           
-          +#ifdef CONFIG_KSU_MANUAL_HOOK
-          +	ksu_handle_stat(&dfd, &filename, &flag); 
-          +#endif
-           	error = vfs_fstatat(dfd, filename, &stat, flag);
-           	if (error)
-           		return error;
-          --- a/fs/exec.c
-          +++ b/fs/exec.c
-          @@ -1886,12 +1886,24 @@
-           	return retval;
-           }
-           
-          +#ifdef CONFIG_KSU_MANUAL_HOOK
-          +__attribute__((hot))
-          +extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
-          +#endif
-          +
-           int do_execve(struct filename *filename,
-           	const char __user *const __user *__argv,
-           	const char __user *const __user *__envp)
-           {
-           	struct user_arg_ptr argv = { .ptr.native = __argv };
-           	struct user_arg_ptr envp = { .ptr.native = __envp };
-          +#ifdef CONFIG_KSU_MANUAL_HOOK
-          +	ksu_handle_execveat((int *)AT_FDCWD, &filename, &argv, &envp, 0);
-          +#endif
-           	return do_execveat_common(AT_FDCWD, filename, argv, envp, 0);
-           }
-           
-          @@ -1919,6 +1931,10 @@
-           		.is_compat = true,
-           		.ptr.compat = __envp,
-           	};
-          +#ifdef CONFIG_KSU_MANUAL_HOOK
-          +	ksu_handle_execveat((int *)AT_FDCWD, &filename, &argv, &envp, 0);
-          +#endif
-           	return do_execveat_common(AT_FDCWD, filename, argv, envp, 0);
-           }
-          --- a/fs/open.c
-          +++ b/fs/open.c
-          @@ -450,8 +450,14 @@
-           	return res;
-           }
-           
-          +#ifdef CONFIG_KSU_MANUAL_HOOK
-          +__attribute__((hot)) 
-          +extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *flags);
-          +#endif
-          +
-           SYSCALL_DEFINE3(faccessat, int, dfd, const char __user *, filename, int, mode)
-           {
-          +#ifdef CONFIG_KSU_MANUAL_HOOK
-          +	ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
-          +#endif
-           	return do_faccessat(dfd, filename, mode);
-           }
-          --- a/kernel/reboot.c
-          +++ b/kernel/reboot.c
-          @@ -277,6 +277,10 @@
-            *
-            * reboot doesn't sync: do that yourself before calling this.
-            */
-          +
-          +#ifdef CONFIG_KSU_MANUAL_HOOK
-          +extern int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg);
-          +#endif
-           
-           SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
-           		void __user *, arg)
-          @@ -284,6 +288,9 @@
-           	char buffer[256];
-           	int ret = 0;
-           
-          +#ifdef CONFIG_KSU_MANUAL_HOOK
-          +	ksu_handle_sys_reboot(magic1, magic2, cmd, &arg);
-          +#endif
-           	/* We only trust the superuser with rebooting the system. */
-           	if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))
-           		return -EPERM;
-          --- a/drivers/input/input.c
-          +++ b/drivers/input/input.c
-          @@ -436,11 +436,20 @@
-            * to 'seed' initial state of a switch or initial position of absolute
-            * axis, etc.
-            */
-          +#ifdef CONFIG_KSU_MANUAL_HOOK
-          +extern bool ksu_input_hook __read_mostly;
-          +extern __attribute__((cold)) int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);
-          +#endif
-          +
-           void input_event(struct input_dev *dev,
-           		 unsigned int type, unsigned int code, int value)
-           {
-           	unsigned long flags;
-           
-          +#ifdef CONFIG_KSU_MANUAL_HOOK
-          +	if (unlikely(ksu_input_hook))
-          +		ksu_handle_input_handle_event(&type, &code, &value);
-          +#endif
-           
-           	if (is_event_supported(type, dev->evbit, EV_MAX)) {
-            
-           		spin_lock_irqsave(&dev->event_lock, flags);
-          --- a/security/selinux/ss/services.c
-          +++ b/security/selinux/ss/services.c
-          @@ -76,7 +76,7 @@
-           int selinux_policycap_openperm;
-           int selinux_policycap_alwaysnetwork;
-           
-          -static DEFINE_RWLOCK(policy_rwlock);
-          +DEFINE_RWLOCK(policy_rwlock);
-           
-           static struct sidtab sidtab;
-           struct policydb policydb;
-          --- a/security/selinux/hooks.c
-          +++ b/security/selinux/hooks.c
-          @@ -95,3 +95,3 @@
-           
-          -static struct security_operations selinux_ops = {
-          +struct security_operations selinux_ops = {
-           	.name =		"selinux",
-          --- a/security/selinux/selinuxfs.c
-          +++ b/security/selinux/selinuxfs.c
-          @@ -41,3 +41,3 @@
-           #include "conditional.h"
-           
-          -static DEFINE_MUTEX(sel_mutex);
-          +DEFINE_MUTEX(sel_mutex);
-          EOF
-
-          patch -p1 < resukisu_manual_hooks.patch
+          echo "===== APPLYING REPO PATCH FILTERS ====="
+          if [ -f "$PATCH_SRC" ]; then
+            patch -p1 < "$PATCH_SRC"
+          else
+            echo "ERROR: Local patch file not found at $PATCH_SRC"
+            exit 1
+          fi
 
           echo "===== ReSukiSU FILE CHECK ====="
           find . -maxdepth 5 \( -iname "*resukisu*" -o -iname "*kernelsu*" -o -iname "*ksu*" \) |
@@ -331,7 +170,14 @@ jobs:
           grep -Ei "LOCALVERSION|KSU|KERNELSU|RESUKISU|MODULE_SIG_PROTECT|CONFIG_UH|CONFIG_RKP|CONFIG_KDP|CONFIG_SECURITY_DEFEX|CONFIG_SVSMC|CONFIG_SAMSUNG_PRODUCT_SHIP" out_resukisu/.config || true
 
           BAD=0
-          for sym in             CONFIG_MODULE_SIG_PROTECT             CONFIG_UH             CONFIG_RKP             CONFIG_KDP             CONFIG_SECURITY_DEFEX             CONFIG_SVSMC             CONFIG_SAMSUNG_PRODUCT_SHIP
+          for sym in \
+            CONFIG_MODULE_SIG_PROTECT \
+            CONFIG_UH \
+            CONFIG_RKP \
+            CONFIG_KDP \
+            CONFIG_SECURITY_DEFEX \
+            CONFIG_SVSMC \
+            CONFIG_SAMSUNG_PRODUCT_SHIP
           do
             if grep -q "^${sym}=y" out_resukisu/.config; then
               echo "ERROR: $sym is still enabled"
@@ -419,7 +265,9 @@ jobs:
 
             if [ ! -s avbtool.py ]; then
               echo "Googlesource failed. Trying GitHub raw mirror..."
-              curl -L --retry 10 --retry-all-errors --retry-delay 5                 -o avbtool.py                 https://raw.githubusercontent.com/aosp-mirror/platform_external_avb/master/avbtool.py
+              curl -L --retry 10 --retry-all-errors --retry-delay 5 \
+                -o avbtool.py \
+                https://raw.githubusercontent.com/aosp-mirror/platform_external_avb/master/avbtool.py
             fi
 
             if [ ! -s avbtool.py ]; then
@@ -479,7 +327,7 @@ jobs:
           def pad(data: bytes, page=PAGE) -> bytes:
               rem = len(data) % page
               if rem:
-                  data += b" " * (page - rem)
+                  data += b"\x00" * (page - rem)
               return data
 
           hdr = bytearray()
@@ -528,12 +376,24 @@ jobs:
           echo "===== Re-footer boot.img with local AVB key rollback index 2 ====="
           python3 avbtool.py erase_footer --image work/firmware/boot.img || true
 
-          python3 avbtool.py add_hash_footer             --image work/firmware/boot.img             --partition_name boot             --partition_size 50331648             --algorithm SHA256_RSA4096             --key avb_keys/r960_local_avb.pem             --rollback_index 2
+          python3 avbtool.py add_hash_footer \
+            --image work/firmware/boot.img \
+            --partition_name boot \
+            --partition_size 50331648 \
+            --algorithm SHA256_RSA4096 \
+            --key avb_keys/r960_local_avb.pem \
+            --rollback_index 2
 
           echo "===== Re-footer init_boot.img with same local AVB key rollback index 2 ====="
           python3 avbtool.py erase_footer --image work/firmware/init_boot_refooter.img || true
 
-          python3 avbtool.py add_hash_footer             --image work/firmware/init_boot_refooter.img             --partition_name init_boot             --partition_size 16777216             --algorithm SHA256_RSA4096             --key avb_keys/r960_local_avb.pem             --rollback_index 2
+          python3 avbtool.py add_hash_footer \
+            --image work/firmware/init_boot_refooter.img \
+            --partition_name init_boot \
+            --partition_size 16777216 \
+            --algorithm SHA256_RSA4096 \
+            --key avb_keys/r960_local_avb.pem \
+            --rollback_index 2
 
           mv work/firmware/init_boot_refooter.img work/firmware/init_boot.img
 
@@ -547,7 +407,16 @@ jobs:
         run: |
           set -e
 
-          python3 avbtool.py make_vbmeta_image             --output work/firmware/vbmeta.img             --algorithm SHA256_RSA4096             --key avb_keys/r960_local_avb.pem             --rollback_index 2             --flags 3             --prop com.android.build.boot.os_version:16             --prop com.android.build.boot.security_patch:2026-02-05             --include_descriptors_from_image work/firmware/boot.img             --include_descriptors_from_image work/firmware/init_boot.img
+          python3 avbtool.py make_vbmeta_image \
+            --output work/firmware/vbmeta.img \
+            --algorithm SHA256_RSA4096 \
+            --key avb_keys/r960_local_avb.pem \
+            --rollback_index 2 \
+            --flags 3 \
+            --prop com.android.build.boot.os_version:16 \
+            --prop com.android.build.boot.security_patch:2026-02-05 \
+            --include_descriptors_from_image work/firmware/boot.img \
+            --include_descriptors_from_image work/firmware/init_boot.img
 
           echo "===== New vbmeta info ====="
           python3 avbtool.py info_image --image work/firmware/vbmeta.img
@@ -567,7 +436,12 @@ jobs:
           cp dist/R960_ReSukiSU_AP.tar dist/R960_ReSukiSU_AP.tar.md5
           md5sum dist/R960_ReSukiSU_AP.tar >> dist/R960_ReSukiSU_AP.tar.md5
 
-          sha256sum             dist/Image-ReSukiSU-R960             dist/resukisu.config             dist/R960_ReSukiSU_AP.tar             dist/R960_ReSukiSU_AP.tar.md5             > dist/SHA256SUMS.txt
+          sha256sum \
+            dist/Image-ReSukiSU-R960 \
+            dist/resukisu.config \
+            dist/R960_ReSukiSU_AP.tar \
+            dist/R960_ReSukiSU_AP.tar.md5 \
+            > dist/SHA256SUMS.txt
 
           cat > dist/RELEASE_NOTES.txt <<'EOF'
           SM-R960 Galaxy Watch6 Classic ReSukiSU AP
@@ -603,3 +477,4 @@ jobs:
             dist/resukisu.config
             dist/SHA256SUMS.txt
             dist/RELEASE_NOTES.txt
+            
