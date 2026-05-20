@@ -81,7 +81,6 @@ jobs:
       - name: Extract Samsung kernel source
         run: |
           set -e
-
           mkdir -p work/kernel
 
           tar -xzf source/Kernel.tar.gz -C work/kernel
@@ -93,7 +92,6 @@ jobs:
       - name: Build no-root custom kernel
         run: |
           set -e
-
           cd work/kernel
 
           export PLATFORM_VERSION=16
@@ -109,14 +107,11 @@ jobs:
 
           make O=out_noroot s5e5515-wise6blue_defconfig
 
-          # Remove dirty-tree plus sign from kernel release.
           printf "" > .scmversion
 
-          # Match stock R960XXU2CZB6 release string.
           ./scripts/config --file out_noroot/.config --set-str LOCALVERSION "-33003255-abR960XXU2CZB6" || true
           ./scripts/config --file out_noroot/.config -d LOCALVERSION_AUTO || true
 
-          # Disable Samsung/custom-kernel blockers if present.
           ./scripts/config --file out_noroot/.config -d MODULE_SIG_PROTECT || true
           ./scripts/config --file out_noroot/.config -d UH || true
           ./scripts/config --file out_noroot/.config -d RKP || true
@@ -130,7 +125,6 @@ jobs:
           echo "===== CONFIG CHECK ====="
           grep -Ei "LOCALVERSION|MODULE_SIG_PROTECT|CONFIG_UH|CONFIG_RKP|CONFIG_KDP|CONFIG_SECURITY_DEFEX|CONFIG_SVSMC|CONFIG_SAMSUNG_PRODUCT_SHIP" out_noroot/.config || true
 
-          echo "===== SAMSUNG BLOCKER STRICT CHECK ====="
           BAD=0
           for sym in \
             CONFIG_MODULE_SIG_PROTECT \
@@ -158,13 +152,9 @@ jobs:
           cp out_noroot/arch/arm64/boot/Image "$GITHUB_WORKSPACE/dist/Image-NoRoot-R960"
           cp out_noroot/.config "$GITHUB_WORKSPACE/dist/noroot.config"
 
-          echo "===== BUILT KERNEL IMAGE ====="
-          ls -lh "$GITHUB_WORKSPACE/dist/Image-NoRoot-R960"
-
       - name: Prepare stock firmware images
         run: |
           set -e
-
           mkdir -p work/firmware
 
           normalize_img() {
@@ -204,25 +194,25 @@ jobs:
             mkdir -p tools
 
             python3 - <<'PY' || true
-import base64
-import time
-import urllib.request
+          import base64
+          import time
+          import urllib.request
 
-url = "https://android.googlesource.com/platform/external/avb/+/refs/heads/main/avbtool.py?format=TEXT"
+          url = "https://android.googlesource.com/platform/external/avb/+/refs/heads/main/avbtool.py?format=TEXT"
 
-for attempt in range(1, 8):
-    try:
-        print(f"Attempt {attempt}: {url}")
-        data = urllib.request.urlopen(url, timeout=60).read()
-        open("avbtool.py", "wb").write(base64.b64decode(data))
-        print("Downloaded avbtool.py from googlesource")
-        raise SystemExit(0)
-    except Exception as e:
-        print("Failed:", e)
-        time.sleep(5)
+          for attempt in range(1, 8):
+              try:
+                  print(f"Attempt {attempt}: {url}")
+                  data = urllib.request.urlopen(url, timeout=60).read()
+                  open("avbtool.py", "wb").write(base64.b64decode(data))
+                  print("Downloaded avbtool.py from googlesource")
+                  raise SystemExit(0)
+              except Exception as e:
+                  print("Failed:", e)
+                  time.sleep(5)
 
-raise SystemExit(1)
-PY
+          raise SystemExit(1)
+          PY
 
             if [ ! -s avbtool.py ]; then
               echo "Googlesource failed. Trying GitHub raw mirror..."
@@ -250,76 +240,76 @@ PY
           set -e
 
           cat > repack_boot_v4.py <<'PY'
-import struct
-from pathlib import Path
+          import struct
+          from pathlib import Path
 
-PAGE = 4096
-SEANDROID = b"SEANDROIDENFORCE"
+          PAGE = 4096
+          SEANDROID = b"SEANDROIDENFORCE"
 
-stock_path = Path("work/firmware/boot.img")
-kernel_path = Path("dist/Image-NoRoot-R960")
-out_path = Path("work/firmware/boot_noroot_noavb.img")
+          stock_path = Path("work/firmware/boot.img")
+          kernel_path = Path("dist/Image-NoRoot-R960")
+          out_path = Path("work/firmware/boot_noroot_noavb.img")
 
-stock = stock_path.read_bytes()
-kernel = kernel_path.read_bytes()
+          stock = stock_path.read_bytes()
+          kernel = kernel_path.read_bytes()
 
-if stock[:8] != b"ANDROID!":
-    raise SystemExit("stock boot.img is not an Android boot image")
+          if stock[:8] != b"ANDROID!":
+              raise SystemExit("stock boot.img is not an Android boot image")
 
-old_kernel_size = struct.unpack("<I", stock[8:12])[0]
-ramdisk_size = struct.unpack("<I", stock[12:16])[0]
-os_version = struct.unpack("<I", stock[16:20])[0]
-header_size = struct.unpack("<I", stock[20:24])[0]
-header_version = struct.unpack("<I", stock[40:44])[0]
-cmdline = stock[44:44 + 1536]
+          old_kernel_size = struct.unpack("<I", stock[8:12])[0]
+          ramdisk_size = struct.unpack("<I", stock[12:16])[0]
+          os_version = struct.unpack("<I", stock[16:20])[0]
+          header_size = struct.unpack("<I", stock[20:24])[0]
+          header_version = struct.unpack("<I", stock[40:44])[0]
+          cmdline = stock[44:44 + 1536]
 
-print("Old kernel size:", old_kernel_size)
-print("New kernel size:", len(kernel))
-print("Ramdisk size:", ramdisk_size)
-print("Header size:", header_size)
-print("Header version:", header_version)
+          print("Old kernel size:", old_kernel_size)
+          print("New kernel size:", len(kernel))
+          print("Ramdisk size:", ramdisk_size)
+          print("Header size:", header_size)
+          print("Header version:", header_version)
 
-if header_version != 4:
-    raise SystemExit(f"Expected boot header v4, got {header_version}")
+          if header_version != 4:
+              raise SystemExit(f"Expected boot header v4, got {header_version}")
 
-if ramdisk_size != 0:
-    raise SystemExit(f"Expected ramdisk_size 0 for R960 boot.img, got {ramdisk_size}")
+          if ramdisk_size != 0:
+              raise SystemExit(f"Expected ramdisk_size 0 for R960 boot.img, got {ramdisk_size}")
 
-def pad(data: bytes, page=PAGE) -> bytes:
-    rem = len(data) % page
-    if rem:
-        data += b"\x00" * (page - rem)
-    return data
+          def pad(data: bytes, page=PAGE) -> bytes:
+              rem = len(data) % page
+              if rem:
+                  data += b"\x00" * (page - rem)
+              return data
 
-hdr = bytearray()
-hdr += b"ANDROID!"
-hdr += struct.pack("<I", len(kernel))
-hdr += struct.pack("<I", 0)
-hdr += struct.pack("<I", os_version)
-hdr += struct.pack("<I", 1584)
-hdr += struct.pack("<4I", 0, 0, 0, 0)
-hdr += struct.pack("<I", 4)
-hdr += cmdline
-hdr += struct.pack("<I", 0)
+          hdr = bytearray()
+          hdr += b"ANDROID!"
+          hdr += struct.pack("<I", len(kernel))
+          hdr += struct.pack("<I", 0)
+          hdr += struct.pack("<I", os_version)
+          hdr += struct.pack("<I", 1584)
+          hdr += struct.pack("<4I", 0, 0, 0, 0)
+          hdr += struct.pack("<I", 4)
+          hdr += cmdline
+          hdr += struct.pack("<I", 0)
 
-if len(hdr) != 1584:
-    raise SystemExit(f"Bad header size: {len(hdr)}")
+          if len(hdr) != 1584:
+              raise SystemExit(f"Bad header size: {len(hdr)}")
 
-img = bytes(hdr)
-img = pad(img)
-img += kernel
-img = pad(img)
-img += SEANDROID
-img = pad(img)
+          img = bytes(hdr)
+          img = pad(img)
+          img += kernel
+          img = pad(img)
+          img += SEANDROID
+          img = pad(img)
 
-if len(img) >= 50331648:
-    raise SystemExit(f"New boot image too large: {len(img)}")
+          if len(img) >= 50331648:
+              raise SystemExit(f"New boot image too large: {len(img)}")
 
-out_path.write_bytes(img)
-print("Wrote:", out_path)
-print("Size:", out_path.stat().st_size)
-print("Room left:", 50331648 - out_path.stat().st_size)
-PY
+          out_path.write_bytes(img)
+          print("Wrote:", out_path)
+          print("Size:", out_path.stat().st_size)
+          print("Room left:", 50331648 - out_path.stat().st_size)
+          PY
 
           python3 repack_boot_v4.py
 
@@ -328,13 +318,11 @@ PY
           set -e
 
           mkdir -p avb_keys
-
           openssl genrsa -out avb_keys/r960_local_avb.pem 4096
 
           cp work/firmware/boot_noroot_noavb.img work/firmware/boot.img
           cp work/firmware/init_boot.img work/firmware/init_boot_refooter.img
 
-          echo "===== Re-footer boot.img with local AVB key rollback index 2 ====="
           python3 avbtool.py erase_footer --image work/firmware/boot.img || true
 
           python3 avbtool.py add_hash_footer \
@@ -345,7 +333,6 @@ PY
             --key avb_keys/r960_local_avb.pem \
             --rollback_index 2
 
-          echo "===== Re-footer init_boot.img with same local AVB key rollback index 2 ====="
           python3 avbtool.py erase_footer --image work/firmware/init_boot_refooter.img || true
 
           python3 avbtool.py add_hash_footer \
@@ -420,15 +407,6 @@ PY
 
           Root solution:
           - None
-
-          Config changes attempted:
-          - CONFIG_MODULE_SIG_PROTECT disabled if present
-          - CONFIG_UH disabled if present
-          - CONFIG_RKP disabled if present
-          - CONFIG_KDP disabled if present
-          - CONFIG_SECURITY_DEFEX disabled if present
-          - CONFIG_SVSMC disabled if present
-          - CONFIG_SAMSUNG_PRODUCT_SHIP disabled if present
 
           Flash only after bootloader unlock.
           This AP tar is for SM-R960 R960XXU2CZB6 only.
