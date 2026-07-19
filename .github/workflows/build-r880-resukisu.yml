@@ -502,8 +502,17 @@ jobs:
             echo ""
             echo "# Injected by R880 workflow: blanket -Wno-error (clang-14 vs Samsung 4.19 is too noisy)"
             echo "KBUILD_CFLAGS += -Wno-error -Wno-unknown-warning-option"
+            echo "KBUILD_CFLAGS += -Wno-error=implicit-function-declaration"
           } >> Makefile
           tail -6 Makefile
+
+          # Strip local -Werror from subdir Makefiles (Samsung drivers/net/wireless/* add their own)
+          echo "===== Stripping local -Werror from subdir Kbuilds/Makefiles ====="
+          grep -rlE "\-Werror" --include=Makefile --include=Kbuild . 2>/dev/null | while read f; do
+            sed -i -E 's/-Werror([=[:alnum:]_-]*)/-Wno-error\1/g' "$f"
+          done
+          echo "Sample post-strip check on wireless driver:"
+          grep -n "Werror" drivers/net/wireless/broadcom/bcmdhd_101_16/Makefile 2>/dev/null | head -5 || true
           export KBUILD_BUILD_USER=dpi
           export KBUILD_BUILD_HOST=VPHORC629
           export PATH="/usr/lib/llvm-14/bin:$PATH"
