@@ -497,14 +497,13 @@ jobs:
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
 
-          # Blanket -Werror in Makefile overrides KCFLAGS. Append -Wno-error flags at end of Makefile
-          # (Makefile top-level vars evaluate in order; last assignment wins for +=).
-          cat >> Makefile <<'MK'
-
-# Injected by R880 workflow: weaken Werror for known-noisy warnings
-KBUILD_CFLAGS += -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-function
-KBUILD_CFLAGS += -Wno-unused-but-set-variable -Wno-unused-variable
-MK
+          # Blanket -Werror in Makefile overrides KCFLAGS. Append -Wno-error flags at end of Makefile.
+          {
+            echo ""
+            echo "# Injected by R880 workflow: weaken Werror for known-noisy warnings"
+            echo "KBUILD_CFLAGS += -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-function"
+            echo "KBUILD_CFLAGS += -Wno-unused-but-set-variable -Wno-unused-variable"
+          } >> Makefile
           tail -6 Makefile
           export KBUILD_BUILD_USER=dpi
           export KBUILD_BUILD_HOST=VPHORC629
