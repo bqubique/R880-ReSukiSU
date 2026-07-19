@@ -8,7 +8,7 @@ on:
         required: true
         default: "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh"
       source_release_tag:
-        description: "Release tag containing Kernel.tar.gz and R865FXXS2JZE1_Kernel.tar.gz"
+        description: "Release tag containing Kernel.tar.gz and R865FXXS2JZE1_kernel.tar.gz"
         required: true
         default: "source-tarballs"
       firmware_release_tag:
@@ -44,7 +44,7 @@ jobs:
           ls -lh source
 
           test -f source/Kernel.tar.gz
-          test -f source/R865FXXS2JZE1_Kernel.tar.gz
+          test -f source/R865FXXS2JZE1_kernel.tar.gz
 
       - name: Download stock R880XXU2JZC2 firmware images
         env:
@@ -88,7 +88,7 @@ jobs:
           mkdir -p work/kernel
 
           tar -xzf source/Kernel.tar.gz -C work/kernel
-          tar -xzf source/R865FXXS2JZE1_Kernel.tar.gz -C work/kernel --strip-components=1
+          tar -xzf source/R865FXXS2JZE1_kernel.tar.gz -C work/kernel --strip-components=1
 
           # Samsung source tarballs can preserve read-only modes.
           # Make the tree writable before ReSukiSU/manual patches edit files.
