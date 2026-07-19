@@ -497,8 +497,18 @@ jobs:
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
 
-          # Suppress Werror on unused-but-set-variable (Samsung 4.19 source triggers it)
-          export KCFLAGS="-Wno-error=unused-but-set-variable -Wno-unused-but-set-variable"
+          # Blanket -Werror in Makefile line 444 overrides KCFLAGS. Weaken via Makefile injection.
+          # Insert -Wno-error flags at the top of KBUILD_CFLAGS extension zone (uses += so runs after Werror).
+          awk '
+            /^KBUILD_CFLAGS   := -Wall/ && !done {
+              print
+              print "KBUILD_CFLAGS += -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-function -Wno-error=implicit-fallthrough"
+              done=1
+              next
+            }
+            { print }
+          ' Makefile > Makefile.new && mv Makefile.new Makefile
+          grep -n "Wno-error=unused-but-set-variable" Makefile | head -3
           export KBUILD_BUILD_USER=dpi
           export KBUILD_BUILD_HOST=VPHORC629
           export PATH="/usr/lib/llvm-14/bin:$PATH"
