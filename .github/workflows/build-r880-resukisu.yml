@@ -496,6 +496,9 @@ jobs:
 
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+
+          # Suppress Werror on unused-but-set-variable (Samsung 4.19 source triggers it)
+          export KCFLAGS="-Wno-error=unused-but-set-variable -Wno-unused-but-set-variable"
           export KBUILD_BUILD_USER=dpi
           export KBUILD_BUILD_HOST=VPHORC629
           export PATH="/usr/lib/llvm-14/bin:$PATH"
