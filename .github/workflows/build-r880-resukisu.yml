@@ -566,6 +566,8 @@ jobs:
           # Disable Samsung debug testing infra (broken include path in Samsung 4.19 source)
           ./scripts/config --file out_resukisu/.config -d SEC_DEBUG || true
           ./scripts/config --file out_resukisu/.config -d SEC_DEBUG_TEST || true
+          # Disable Infineon wifi driver (missing CFG80211_* macros; R880 uses Broadcom)
+          ./scripts/config --file out_resukisu/.config -d IFX43012 || true
 
           # Optional documented manual-hook helpers. Unknown symbols are dropped by olddefconfig.
           ./scripts/config --file out_resukisu/.config -e KSU_MANUAL_HOOK_AUTO_INPUT_HOOK || true
