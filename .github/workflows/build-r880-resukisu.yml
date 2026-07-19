@@ -513,6 +513,13 @@ jobs:
           done
           echo "Sample post-strip check on wireless driver:"
           grep -n "Werror" drivers/net/wireless/broadcom/bcmdhd_101_16/Makefile 2>/dev/null | head -5 || true
+
+          # Samsung sources sometimes reference soc/samsung/exynos/*.h though headers live in soc/samsung/*.h.
+          # Symlink the exynos subdir back to samsung so those includes resolve.
+          if [ -d include/soc/samsung ] && [ ! -e include/soc/samsung/exynos ]; then
+            ln -s . include/soc/samsung/exynos
+            echo "Symlinked include/soc/samsung/exynos -> ."
+          fi
           export KBUILD_BUILD_USER=dpi
           export KBUILD_BUILD_HOST=VPHORC629
           export PATH="/usr/lib/llvm-14/bin:$PATH"
@@ -556,6 +563,9 @@ jobs:
 
           # Disable 32-bit compat VDSO only — keep COMPAT enabled (drivers depend on it)
           ./scripts/config --file out_resukisu/.config -d COMPAT_VDSO || true
+          # Disable Samsung debug testing infra (broken include path in Samsung 4.19 source)
+          ./scripts/config --file out_resukisu/.config -d SEC_DEBUG || true
+          ./scripts/config --file out_resukisu/.config -d SEC_DEBUG_TEST || true
 
           # Optional documented manual-hook helpers. Unknown symbols are dropped by olddefconfig.
           ./scripts/config --file out_resukisu/.config -e KSU_MANUAL_HOOK_AUTO_INPUT_HOOK || true
