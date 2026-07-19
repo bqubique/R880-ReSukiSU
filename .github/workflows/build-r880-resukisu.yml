@@ -612,7 +612,17 @@ jobs:
           make O=out_resukisu -j"$(nproc)"
 
           mkdir -p "$GITHUB_WORKSPACE/dist"
-          cp out_resukisu/arch/arm64/boot/Image "$GITHUB_WORKSPACE/dist/Image-ReSukiSU-R880"
+          # Prefer compressed kernel to fit into stock partition size (stock is gzipped)
+          if [ -f out_resukisu/arch/arm64/boot/Image.gz ]; then
+            cp out_resukisu/arch/arm64/boot/Image.gz "$GITHUB_WORKSPACE/dist/Image-ReSukiSU-R880"
+            echo "Using Image.gz"
+          elif [ -f out_resukisu/arch/arm64/boot/Image.lz4 ]; then
+            cp out_resukisu/arch/arm64/boot/Image.lz4 "$GITHUB_WORKSPACE/dist/Image-ReSukiSU-R880"
+            echo "Using Image.lz4"
+          else
+            gzip -9 -k -c out_resukisu/arch/arm64/boot/Image > "$GITHUB_WORKSPACE/dist/Image-ReSukiSU-R880"
+            echo "Manually gzipped Image"
+          fi
           cp out_resukisu/.config "$GITHUB_WORKSPACE/dist/resukisu.config"
 
           echo "===== BUILT KERNEL IMAGE ====="
@@ -709,6 +719,10 @@ jobs:
           mkdir -p work/boot_unpack
           python3 "$UNPACK" --boot_img work/firmware/boot.img --out work/boot_unpack --format=mkbootimg > work/boot_unpack/mkbootimg_args.txt
           cat work/boot_unpack/mkbootimg_args.txt
+
+          echo "===== Stock kernel file info ====="
+          file work/boot_unpack/kernel
+          ls -lh work/boot_unpack/kernel dist/Image-ReSukiSU-R880
 
           # Swap kernel with our ReSukiSU Image
           cp dist/Image-ReSukiSU-R880 work/boot_unpack/kernel
