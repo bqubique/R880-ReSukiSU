@@ -473,9 +473,25 @@ jobs:
               ln -sf /usr/lib/llvm-14/bin/$t "$base/toolchain/clang/host/linux-x86/clang-r383902/bin/$t"
             done
           }
+          setup_gcc_at() {
+            local base="$1"
+            mkdir -p "$base/toolchain/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin"
+            for t in gcc g++ ld ar nm objcopy objdump readelf strip as ranlib addr2line strings size gcov ld.bfd ld.gold; do
+              src="/usr/bin/aarch64-linux-gnu-$t"
+              [ -x "$src" ] && ln -sf "$src" "$base/toolchain/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin/aarch64-linux-android-$t"
+            done
+            mkdir -p "$base/toolchain/gcc/linux-x86/arm/arm-linux-androideabi-4.9/bin"
+            for t in gcc g++ ld ar nm objcopy objdump readelf strip as ranlib addr2line strings size; do
+              src="/usr/bin/arm-linux-gnueabi-$t"
+              [ -x "$src" ] && ln -sf "$src" "$base/toolchain/gcc/linux-x86/arm/arm-linux-androideabi-4.9/bin/arm-linux-androideabi-$t"
+            done
+          }
           setup_toolchain_at ..                            # work/kernel/../toolchain
           setup_toolchain_at .                             # work/kernel/toolchain (in-source)
           mkdir -p out_resukisu && setup_toolchain_at out_resukisu   # work/kernel/out_resukisu/toolchain
+          setup_gcc_at ..
+          setup_gcc_at .
+          setup_gcc_at out_resukisu
           ls -la ../toolchain/clang/host/linux-x86/clang-r383902/bin/clang toolchain/clang/host/linux-x86/clang-r383902/bin/clang
 
           export CROSS_COMPILE=aarch64-linux-gnu-
