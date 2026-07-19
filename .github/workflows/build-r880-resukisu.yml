@@ -469,6 +469,10 @@ jobs:
           export KBUILD_BUILD_HOST=VPHORC629
           export PATH="/usr/lib/llvm-14/bin:$PATH"
 
+          # 4.19 dtc host build fails with modern binutils (-fno-common default)
+          export KBUILD_HOSTCFLAGS="-fcommon"
+          export HOSTCFLAGS="-fcommon"
+
           make O=out_resukisu exynos5515-freshbs_defconfig
 
           printf "" > .scmversion
@@ -645,13 +649,9 @@ jobs:
 
           cp work/firmware/boot_resukisu_noavb.img work/firmware/boot.img
 
-          # NOTE: Set BOOT_PART_SIZE from stock boot partition size (Odin .pit / fastboot getvar).
-          # Placeholder 33554432 (32 MiB) — verify against actual R880 boot partition.
-          BOOT_PART_SIZE=33554432
-
-          # NOTE: Rollback index for JZC2 — run `python3 avbtool.py info_image --image <stock boot.img>`
-          # on the original firmware and set STOCK_RB to that value.
-          STOCK_RB=2
+          # Verified from stock R880XXU2JZC2 boot.img via avbtool info_image:
+          BOOT_PART_SIZE=37748736
+          STOCK_RB=0
 
           echo "===== Re-footer boot.img with local AVB key ====="
           python3 avbtool.py erase_footer --image work/firmware/boot.img || true
@@ -671,7 +671,7 @@ jobs:
         run: |
           set -e
 
-          STOCK_RB=2
+          STOCK_RB=0
           python3 avbtool.py make_vbmeta_image \
             --output work/firmware/vbmeta.img \
             --algorithm SHA256_RSA4096 \
