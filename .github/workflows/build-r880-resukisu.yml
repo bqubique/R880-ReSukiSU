@@ -462,13 +462,21 @@ jobs:
           export TARGET_SOC=s5e5515
           export ARCH=arm64
           # 4.19 Samsung kernel Makefile hardcodes ../toolchain/clang/host/linux-x86/clang-r383902/bin/clang.
-          # Symlink installed clang-14 there so Samsung's build scripts resolve it.
-          mkdir -p ../toolchain/clang/host/linux-x86/clang-r383902/bin
-          ln -sf /usr/lib/llvm-14/bin/clang ../toolchain/clang/host/linux-x86/clang-r383902/bin/clang
-          ln -sf /usr/lib/llvm-14/bin/clang ../toolchain/clang/host/linux-x86/clang-r383902/bin/clang-14
-          for t in ld.lld llvm-ar llvm-nm llvm-objcopy llvm-objdump llvm-readelf llvm-strip llvm-as; do
-            ln -sf /usr/lib/llvm-14/bin/$t ../toolchain/clang/host/linux-x86/clang-r383902/bin/$t
-          done
+          # That relative path may be resolved from either the source root or O= build dir.
+          # Populate symlinks at both candidate locations.
+          setup_toolchain_at() {
+            local base="$1"
+            mkdir -p "$base/toolchain/clang/host/linux-x86/clang-r383902/bin"
+            ln -sf /usr/lib/llvm-14/bin/clang    "$base/toolchain/clang/host/linux-x86/clang-r383902/bin/clang"
+            ln -sf /usr/lib/llvm-14/bin/clang-14 "$base/toolchain/clang/host/linux-x86/clang-r383902/bin/clang-14"
+            for t in ld.lld llvm-ar llvm-nm llvm-objcopy llvm-objdump llvm-readelf llvm-strip llvm-as; do
+              ln -sf /usr/lib/llvm-14/bin/$t "$base/toolchain/clang/host/linux-x86/clang-r383902/bin/$t"
+            done
+          }
+          setup_toolchain_at ..                            # work/kernel/../toolchain
+          setup_toolchain_at .                             # work/kernel/toolchain (in-source)
+          mkdir -p out_resukisu && setup_toolchain_at out_resukisu   # work/kernel/out_resukisu/toolchain
+          ls -la ../toolchain/clang/host/linux-x86/clang-r383902/bin/clang toolchain/clang/host/linux-x86/clang-r383902/bin/clang
 
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
