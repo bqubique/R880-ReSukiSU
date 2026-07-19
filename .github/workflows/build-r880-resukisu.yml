@@ -266,7 +266,7 @@ jobs:
 
           re_patch(
               "fs/exec.c",
-              r'(static int do_execve\(struct filename \*filename,)',
+              r'(\nint do_execve\(struct filename \*filename,)',
               r'#ifdef CONFIG_KSU_MANUAL_HOOK\n/* ReSukiSU manual hook: execveat extern */\n__attribute__((hot))\nextern int ksu_handle_execveat(int *fd, struct filename **filename_ptr,\n                               void *argv, void *envp, int *flags);\n#endif\n\n\1',
               "ReSukiSU manual hook: execveat extern",
               required=True,
