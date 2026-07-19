@@ -568,6 +568,15 @@ jobs:
           ./scripts/config --file out_resukisu/.config -d SEC_DEBUG_TEST || true
           # Disable Infineon wifi driver (missing CFG80211_* macros; R880 uses Broadcom)
           ./scripts/config --file out_resukisu/.config -d IFX43012 || true
+          # Trim kernel to fit stock boot partition (KSU adds ~500 KB; disable debug info)
+          ./scripts/config --file out_resukisu/.config -d DEBUG_INFO || true
+          ./scripts/config --file out_resukisu/.config -d DEBUG_INFO_REDUCED || true
+          ./scripts/config --file out_resukisu/.config -d DEBUG_INFO_SPLIT || true
+          ./scripts/config --file out_resukisu/.config -d DEBUG_INFO_DWARF4 || true
+          ./scripts/config --file out_resukisu/.config -d DEBUG_INFO_BTF || true
+          ./scripts/config --file out_resukisu/.config -d GDB_SCRIPTS || true
+          ./scripts/config --file out_resukisu/.config -d KALLSYMS_ALL || true
+          ./scripts/config --file out_resukisu/.config -d KALLSYMS_EXTRA_PASS || true
 
           # Optional documented manual-hook helpers. Unknown symbols are dropped by olddefconfig.
           ./scripts/config --file out_resukisu/.config -e KSU_MANUAL_HOOK_AUTO_INPUT_HOOK || true
