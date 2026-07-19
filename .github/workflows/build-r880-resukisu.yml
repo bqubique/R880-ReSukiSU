@@ -500,16 +500,8 @@ jobs:
           # Blanket -Werror in Makefile overrides KCFLAGS. Append -Wno-error flags at end of Makefile.
           {
             echo ""
-            echo "# Injected by R880 workflow: weaken Werror for known-noisy warnings"
-            echo "KBUILD_CFLAGS += -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-function"
-            echo "KBUILD_CFLAGS += -Wno-unused-but-set-variable -Wno-unused-variable"
-            echo "KBUILD_CFLAGS += -Wno-error=align-mismatch -Wno-align-mismatch"
-            echo "KBUILD_CFLAGS += -Wno-error=implicit-fallthrough -Wno-error=misleading-indentation"
-            echo "KBUILD_CFLAGS += -Wno-error=uninitialized"
-            echo "KBUILD_CFLAGS += -Wno-error=deprecated-declarations -Wno-error=array-bounds"
-            echo "KBUILD_CFLAGS += -Wno-error=void-pointer-to-int-cast -Wno-error=pointer-to-int-cast"
-            echo "KBUILD_CFLAGS += -Wno-error=implicit-function-declaration"
-            echo "KBUILD_CFLAGS += -Wno-unknown-warning-option"
+            echo "# Injected by R880 workflow: blanket -Wno-error (clang-14 vs Samsung 4.19 is too noisy)"
+            echo "KBUILD_CFLAGS += -Wno-error -Wno-unknown-warning-option"
           } >> Makefile
           tail -6 Makefile
           export KBUILD_BUILD_USER=dpi
