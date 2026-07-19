@@ -537,6 +537,10 @@ jobs:
           ./scripts/config --file out_resukisu/.config -e RESUKISU || true
           ./scripts/config --file out_resukisu/.config -e KSU_MANUAL_HOOK || true
 
+          # Disable 32-bit compat VDSO — needs arm32 cross toolchain, not required on watch
+          ./scripts/config --file out_resukisu/.config -d COMPAT_VDSO || true
+          ./scripts/config --file out_resukisu/.config -d COMPAT || true
+
           # Optional documented manual-hook helpers. Unknown symbols are dropped by olddefconfig.
           ./scripts/config --file out_resukisu/.config -e KSU_MANUAL_HOOK_AUTO_INPUT_HOOK || true
           ./scripts/config --file out_resukisu/.config -e KSU_MANUAL_HOOK_AUTO_SETUID_HOOK || true
