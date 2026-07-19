@@ -575,8 +575,7 @@ jobs:
           ./scripts/config --file out_resukisu/.config -d DEBUG_INFO_DWARF4 || true
           ./scripts/config --file out_resukisu/.config -d DEBUG_INFO_BTF || true
           ./scripts/config --file out_resukisu/.config -d GDB_SCRIPTS || true
-          ./scripts/config --file out_resukisu/.config -d KALLSYMS_ALL || true
-          ./scripts/config --file out_resukisu/.config -d KALLSYMS_EXTRA_PASS || true
+          ./scripts/config --file out_resukisu/.config -e KALLSYMS_ALL || true
 
           # Optional documented manual-hook helpers. Unknown symbols are dropped by olddefconfig.
           ./scripts/config --file out_resukisu/.config -e KSU_MANUAL_HOOK_AUTO_INPUT_HOOK || true
