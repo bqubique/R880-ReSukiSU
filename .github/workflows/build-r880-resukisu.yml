@@ -507,6 +507,8 @@ jobs:
             echo "KBUILD_CFLAGS += -Wno-error=implicit-fallthrough -Wno-error=misleading-indentation"
             echo "KBUILD_CFLAGS += -Wno-error=uninitialized"
             echo "KBUILD_CFLAGS += -Wno-error=deprecated-declarations -Wno-error=array-bounds"
+            echo "KBUILD_CFLAGS += -Wno-error=void-pointer-to-int-cast -Wno-error=pointer-to-int-cast"
+            echo "KBUILD_CFLAGS += -Wno-error=implicit-function-declaration"
             echo "KBUILD_CFLAGS += -Wno-unknown-warning-option"
           } >> Makefile
           tail -6 Makefile
@@ -551,9 +553,8 @@ jobs:
           ./scripts/config --file out_resukisu/.config -e RESUKISU || true
           ./scripts/config --file out_resukisu/.config -e KSU_MANUAL_HOOK || true
 
-          # Disable 32-bit compat VDSO — needs arm32 cross toolchain, not required on watch
+          # Disable 32-bit compat VDSO only — keep COMPAT enabled (drivers depend on it)
           ./scripts/config --file out_resukisu/.config -d COMPAT_VDSO || true
-          ./scripts/config --file out_resukisu/.config -d COMPAT || true
 
           # Optional documented manual-hook helpers. Unknown symbols are dropped by olddefconfig.
           ./scripts/config --file out_resukisu/.config -e KSU_MANUAL_HOOK_AUTO_INPUT_HOOK || true
