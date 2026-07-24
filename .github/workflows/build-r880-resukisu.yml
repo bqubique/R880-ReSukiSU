@@ -785,10 +785,11 @@ jobs:
 
           mkdir -p final_ap
 
-          cp work/firmware/boot.img final_ap/boot.img
-          cp work/firmware/vbmeta.img final_ap/vbmeta.img
+          # NetOdin expects .img.lz4 members inside AP tar (Samsung Odin format)
+          lz4 -9 -f work/firmware/boot.img   final_ap/boot.img.lz4
+          lz4 -9 -f work/firmware/vbmeta.img final_ap/vbmeta.img.lz4
 
-          tar --format=posix -cf dist/R880_ReSukiSU_Complete_AP.tar -C final_ap boot.img vbmeta.img
+          tar --format=posix -H ustar -cf dist/R880_ReSukiSU_Complete_AP.tar -C final_ap boot.img.lz4 vbmeta.img.lz4
 
           cp dist/R880_ReSukiSU_Complete_AP.tar dist/R880_ReSukiSU_Complete_AP.tar.md5
           md5sum dist/R880_ReSukiSU_Complete_AP.tar >> dist/R880_ReSukiSU_Complete_AP.tar.md5
